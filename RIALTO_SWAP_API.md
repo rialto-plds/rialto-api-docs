@@ -29,7 +29,7 @@ Registry deployments:
 
 | Chain | Chain id | API access | Router Registry |
 | --- | --- | --- | --- |
-| RH Chain | `chain_id` | `<your_robinhood_rpc_url>` | `0x71a120CbBf3Ce7cD910a3c50fF77aFc62735687E` |
+| RH Chain | `4663` | `<your_robinhood_rpc_url>` | `0x71a120CbBf3Ce7cD910a3c50fF77aFc62735687E` |
 
 Registry reads:
 
@@ -162,7 +162,7 @@ Example response shape:
 
 ```json
 {
-  "chain_id": chain_id,
+  "chain_id": 4663,
   "tokens": [
     {
       "name": "ETH",
@@ -284,7 +284,7 @@ Example response shape:
   "permit2": {
     "domain": {
       "name": "Permit2",
-      "chainId": chain_id,
+      "chainId": 4663,
       "verifyingContract": "<permit2_contract_address>"
     },
     "types": {
@@ -351,7 +351,7 @@ Example response shape:
     "simulationIncomplete": false,
     "invalidSourcesPassed": []
   },
-  "chain_id": chain_id,
+  "chain_id": 4663,
   "sell_token": "<sell_token_address>",
   "buy_token": "<buy_token_address>",
   "sell_amount": "10000000000000000",
@@ -395,7 +395,7 @@ Example response shape:
     "gas_estimate": 106046,
     "legs": [
       {
-        "pool_id": "uniswap-v3:chain-chain_id:<pool_address>:100",
+        "pool_id": "uniswap-v3:chain-4663:<pool_address>:100",
         "sell_token": "<sell_token_address>",
         "buy_token": "<buy_token_address>",
         "sell_amount": "10000000000000000",
@@ -566,7 +566,7 @@ Add `permit2_owner` to the standard quote request:
 API_KEY='rialto_live_example.redacted_secret'
 TAKER='<taker_wallet_address>'
 
-curl -sS "https://rialto-trade-api.rialto.xyz/quote?sell_token=USDG&buy_token=WEEK&sell_amount=1&taker=$TAKER&permit2_owner=$TAKER&slippage_bps=50&chain_id=0000" \
+curl -sS "https://rialto-trade-api.rialto.xyz/quote?sell_token=USDG&buy_token=WEEK&sell_amount=1&taker=$TAKER&permit2_owner=$TAKER&slippage_bps=50&chain_id=4663" \
   -H "Authorization: Bearer $API_KEY"
 ```
 
@@ -619,7 +619,7 @@ Example response:
   "relay_id": "f3f6a35f-93b9-4629-9a2e-02d2b80648ef",
   "quote_id": "b7b0a3d8-9f6a-4f4a-92d2-1b0e4b5d0c6a",
   "status": "submitted",
-  "chain_id": chain_id,
+  "chain_id": 4663,
   "tx_hash": "0x6b8f...",
   "error": null
 }
@@ -675,7 +675,7 @@ from eth_account.messages import encode_typed_data
 from web3 import Web3
 
 API_BASE = "https://rialto-trade-api.rialto.xyz"
-CHAIN_ID = chain_id
+CHAIN_ID = 4663
 SELL_TOKEN = "USDG"
 BUY_TOKEN = "WEEK"
 SELL_AMOUNT = "1"
@@ -869,7 +869,7 @@ Request body:
 
 | Field | Description |
 | --- | --- |
-| `chain_id` | Optional chain id. Use `chain_id` for RH. |
+| `chain_id` | Optional chain id. Use `4663` for RH. |
 | `wallet` | Owner wallet that will sign. |
 | `action` | One of `create_integrator_application`, `create_integrator_api_key`, `revoke_integrator_api_key`, `view_integrator_profile`. |
 | `payload_hash` | Required for create/revoke actions. Not required for `view_integrator_profile`. |
@@ -997,7 +997,7 @@ from eth_account.messages import encode_defunct
 from eth_utils import keccak
 
 API_BASE = "https://rialto-trade-api.rialto.xyz"
-CHAIN_ID = chain_id
+CHAIN_ID = 4663
 ACTION_CREATE_APPLICATION = "create_integrator_application"
 ACTION_CREATE_API_KEY = "create_integrator_api_key"
 
@@ -1270,7 +1270,7 @@ from eth_account.messages import encode_typed_data
 from web3 import Web3
 
 API_BASE = "https://rialto-trade-api.rialto.xyz"
-CHAIN_ID = chain_id
+CHAIN_ID = 4663
 SELL_TOKEN = "USDG"
 BUY_TOKEN = "WEEK"
 SELL_AMOUNT = "0.532262"
