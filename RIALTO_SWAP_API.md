@@ -223,6 +223,7 @@ Optional query params:
 | `chain_id` | Chain id. Defaults to the server's configured chain. |
 | `max_hops` | Optional route-depth hint; final route policy is controlled server-side. |
 | `permit2_owner` | Optional non-zero Permit2 token owner for gasless/relayed ERC20 swaps. For gasless, this must equal `taker`. Also accepts `permit2Owner` and `permitOwner`. |
+| `settlement` | Optional fund-pull preference: `auto`, `permit2`, or `allowance`. Defaults to `auto`. Also accepts `settlementPreference`. |
 | `swap_fee_bps` | Integrator fee in basis points. Requires an integrator key — see [Integrator Fees](#integrator-fees). |
 | `swap_fee_token` | Optional fee-token hint. Fees are charged in the token selected by Rialto. |
 | `swap_fee_recipient` | Ignored. The payout wallet is bound to the API key. |
@@ -432,6 +433,19 @@ The payload to send on-chain lives in the quote's `tx` object:
 The `settlement` field tells you which mode applies. Choose your handling from
 `settlement`, not from assumptions — the backend decides the mode.
 
+You can influence that decision with the optional `/quote` request param
+`settlement`:
+
+| Request value | Behavior |
+| --- | --- |
+| `auto` | Default. Uses Permit2 for EOA ERC20 sells, and allowance mode for smart-wallet or native ETH sells. |
+| `permit2` | Requires a Permit2 executable quote. Use this for gasless relays or integrations that specifically need Permit2. Native ETH sells and smart-wallet takers cannot use this mode. |
+| `allowance` | Requires router allowance mode. The response has no `permit2` payload or `tx.signature_offset`; ERC20 users approve the router spender in `issues.allowance.spender`. |
+
+The response `settlement` is always the executable mode actually returned by the
+backend (`permit2` or `allowance`). Use the response value for transaction
+handling even when you pass a request preference.
+
 Do not modify `quote_id`, `route`, `platform_fee`, `permit2.message.witness`, or
 `tx.data` except for replacing the Permit2 signature placeholder described
 below. A changed route or witness will not match the signed quote and may revert.
@@ -551,7 +565,7 @@ witness signature, but the relayer wallet pays the network gas.
 
 | Constraint | Behavior |
 | --- | --- |
-| Settlement | Gasless requires `settlement: "permit2"` and a returned `permit2` payload. |
+| Settlement | Gasless requires `settlement: "permit2"` and a returned `permit2` payload. Pass `settlement=permit2` if you want the quote request to fail instead of falling back to allowance mode. |
 | Token type | ERC20 sells only. Native ETH sells require the taker-submitted flow. |
 | Permit owner | Pass `permit2_owner=<taker>` on `/quote`. For gasless, `permit2_owner` must equal `taker`. |
 | Recipient | The quote response controls the recipient through the Permit2 witness. Do not edit it. |
@@ -566,7 +580,7 @@ Add `permit2_owner` to the standard quote request:
 API_KEY='rialto_live_example.redacted_secret'
 TAKER='<taker_wallet_address>'
 
-curl -sS "https://rialto-trade-api.rialto.xyz/quote?sell_token=USDG&buy_token=WEEK&sell_amount=1&taker=$TAKER&permit2_owner=$TAKER&slippage_bps=50&chain_id=4663" \
+curl -sS "https://rialto-trade-api.rialto.xyz/quote?sell_token=USDG&buy_token=WEEK&sell_amount=1&taker=$TAKER&permit2_owner=$TAKER&settlement=permit2&slippage_bps=50&chain_id=4663" \
   -H "Authorization: Bearer $API_KEY"
 ```
 
