@@ -208,13 +208,17 @@ Required query params:
 
 | Param | Description |
 | --- | --- |
-| `sell_token` | Token symbol or token address. |
-| `buy_token` | Token symbol or token address. |
+| `sell_token` | Canonical `0x`-prefixed token address. Symbols are not accepted. |
+| `buy_token` | Canonical `0x`-prefixed token address. Symbols are not accepted. |
 | `sell_amount` | Human decimal sell amount, for example `0.01`. |
 | `taker` | Non-zero wallet address that will receive output. |
 | `slippage_bps` | Max slippage in basis points. Example: `50` means 0.50%. |
 
 `slippageBps` is also accepted as an alias for `slippage_bps`.
+
+`/quote` accepts token addresses only. Pass the canonical `address` value for
+each token. Symbol values such as `WETH` or `USDG` are rejected because
+symbols are not unique.
 
 Optional query params:
 
@@ -233,7 +237,7 @@ Example:
 ```bash
 API_KEY='rialto_live_example.redacted_secret'
 
-curl -sS 'https://rialto-trade-api.rialto.xyz/quote?sell_token=WETH&buy_token=USDG&sell_amount=0.01&taker=<taker_wallet_address>&slippage_bps=50' \
+curl -sS 'https://rialto-trade-api.rialto.xyz/quote?sell_token=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73&buy_token=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168&sell_amount=0.01&taker=<taker_wallet_address>&slippage_bps=50' \
   -H "Authorization: Bearer $API_KEY"
 ```
 
@@ -580,7 +584,7 @@ Add `permit2_owner` to the standard quote request:
 API_KEY='rialto_live_example.redacted_secret'
 TAKER='<taker_wallet_address>'
 
-curl -sS "https://rialto-trade-api.rialto.xyz/quote?sell_token=USDG&buy_token=WEEK&sell_amount=1&taker=$TAKER&permit2_owner=$TAKER&settlement=permit2&slippage_bps=50&chain_id=4663" \
+curl -sS "https://rialto-trade-api.rialto.xyz/quote?sell_token=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168&buy_token=0xc93a8c440CEa26D7445dF01729f193b27965099f&sell_amount=1&taker=$TAKER&permit2_owner=$TAKER&settlement=permit2&slippage_bps=50&chain_id=4663" \
   -H "Authorization: Bearer $API_KEY"
 ```
 
@@ -690,8 +694,8 @@ from web3 import Web3
 
 API_BASE = "https://rialto-trade-api.rialto.xyz"
 CHAIN_ID = 4663
-SELL_TOKEN = "USDG"
-BUY_TOKEN = "WEEK"
+SELL_TOKEN = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168"
+BUY_TOKEN = "0xc93a8c440CEa26D7445dF01729f193b27965099f"
 SELL_AMOUNT = "1"
 SLIPPAGE_BPS = 50
 
@@ -822,7 +826,7 @@ if relay["status"] != "confirmed":
 ```bash
 API_KEY='rialto_live_example.redacted_secret'
 
-curl -sS 'https://rialto-trade-api.rialto.xyz/quote?sell_token=WETH&buy_token=USDG&sell_amount=0.01&taker=<taker_wallet_address>&slippage_bps=50' \
+curl -sS 'https://rialto-trade-api.rialto.xyz/quote?sell_token=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73&buy_token=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168&sell_amount=0.01&taker=<taker_wallet_address>&slippage_bps=50' \
   -H "Authorization: Bearer $API_KEY" -o quote.json
 
 # In your app:
@@ -1191,7 +1195,7 @@ a normal quote.
 ```bash
 INTEGRATOR_KEY='rialto_live_integrator.redacted_secret'
 
-curl -sS 'https://rialto-trade-api.rialto.xyz/quote?sell_token=WETH&buy_token=USDG&sell_amount=0.01&taker=<taker_wallet_address>&slippage_bps=50&swap_fee_bps=30' \
+curl -sS 'https://rialto-trade-api.rialto.xyz/quote?sell_token=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73&buy_token=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168&sell_amount=0.01&taker=<taker_wallet_address>&slippage_bps=50&swap_fee_bps=30' \
   -H "Authorization: Bearer $INTEGRATOR_KEY"
 ```
 
@@ -1285,8 +1289,8 @@ from web3 import Web3
 
 API_BASE = "https://rialto-trade-api.rialto.xyz"
 CHAIN_ID = 4663
-SELL_TOKEN = "USDG"
-BUY_TOKEN = "WEEK"
+SELL_TOKEN = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168"
+BUY_TOKEN = "0xc93a8c440CEa26D7445dF01729f193b27965099f"
 SELL_AMOUNT = "0.532262"
 SLIPPAGE_BPS = 50
 SWAP_FEE_BPS = 50
