@@ -127,8 +127,11 @@ gas:
 
 Use this when the user signs Permit2 and Rialto broadcasts the transaction:
 
+If your own relayer broadcasts the returned transaction, pass `permit2_owner`
+but omit `gasless_relay` and do not call `/gasless/submit`.
+
 1. Call `GET /quote` with the normal quote params plus
-   `permit2_owner=<taker wallet>`.
+   `permit2_owner=<taker wallet>&gasless_relay=true`.
 2. Inspect `quote.issues`. The taker must have enough balance and enough
    allowance to Permit2 before relay submission.
 3. Have the taker sign the returned EIP-712 `permit2` typed data.
@@ -226,7 +229,8 @@ Optional query params:
 | --- | --- |
 | `chain_id` | Chain id. Defaults to the server's configured chain. |
 | `max_hops` | Optional route-depth hint; final route policy is controlled server-side. |
-| `permit2_owner` | Optional non-zero Permit2 token owner for gasless/relayed ERC20 swaps. For gasless, this must equal `taker`. Also accepts `permit2Owner` and `permitOwner`. |
+| `permit2_owner` | Optional non-zero Permit2 token owner for caller-submitted or relayed ERC20 swaps. Must equal `taker` in v1. Also accepts `permit2Owner` and `permitOwner`. This selects Permit2 ownership; it does not imply Rialto pays gas. |
+| `gasless_relay` | Set to `true` only when the quote will be submitted through Rialto's `/gasless/submit`. Requires `permit2_owner`. Also accepts `gaslessRelay`. |
 | `settlement` | Optional fund-pull preference: `auto`, `permit2`, or `allowance`. Defaults to `auto`. Also accepts `settlementPreference`. |
 | `swap_fee_bps` | Integrator fee in basis points. Requires an integrator key — see [Integrator Fees](#integrator-fees). |
 | `swap_fee_token` | Optional fee-token hint. Fees are charged in the token selected by Rialto. |
@@ -572,19 +576,20 @@ witness signature, but the relayer wallet pays the network gas.
 | Settlement | Gasless requires `settlement: "permit2"` and a returned `permit2` payload. Pass `settlement=permit2` if you want the quote request to fail instead of falling back to allowance mode. |
 | Token type | ERC20 sells only. Native ETH sells require the taker-submitted flow. |
 | Permit owner | Pass `permit2_owner=<taker>` on `/quote`. For gasless, `permit2_owner` must equal `taker`. |
+| Relay opt-in | Pass `gasless_relay=true`. Permit2 settlement alone does not authorize Rialto to relay the transaction. |
 | Recipient | The quote response controls the recipient through the Permit2 witness. Do not edit it. |
 | Allowance | The taker must still approve Permit2 if `issues.allowance` is non-null. |
 | Balance | Do not submit if `issues.balance` is non-null. |
 
 ### Step 1: request a gasless quote
 
-Add `permit2_owner` to the standard quote request:
+Add `permit2_owner` and `gasless_relay=true` to the standard quote request:
 
 ```bash
 API_KEY='rialto_live_example.redacted_secret'
 TAKER='<taker_wallet_address>'
 
-curl -sS "https://rialto-trade-api.rialto.xyz/quote?sell_token=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168&buy_token=0xc93a8c440CEa26D7445dF01729f193b27965099f&sell_amount=1&taker=$TAKER&permit2_owner=$TAKER&settlement=permit2&slippage_bps=50&chain_id=4663" \
+curl -sS "https://rialto-trade-api.rialto.xyz/quote?sell_token=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168&buy_token=0xc93a8c440CEa26D7445dF01729f193b27965099f&sell_amount=1&taker=$TAKER&permit2_owner=$TAKER&gasless_relay=true&settlement=permit2&slippage_bps=50&chain_id=4663" \
   -H "Authorization: Bearer $API_KEY"
 ```
 
@@ -613,7 +618,7 @@ Request body:
 
 | Field | Description |
 | --- | --- |
-| `quote_id` | UUID returned by `/quote`. The quote must have been requested with `permit2_owner`. |
+| `quote_id` | UUID returned by `/quote`. The quote must have been requested with `permit2_owner` and `gasless_relay=true`. |
 | `signature` | `0x`-prefixed 65-byte Permit2 signature over the typed data returned by `/quote`. |
 | `idempotency_key` | Optional client-generated unique string for one relay attempt, such as your internal order id or a UUID. Reuse the same value only when retrying the same quote submission; do not reuse it across different quotes or users. |
 
@@ -740,6 +745,7 @@ params = {
     "sell_amount": SELL_AMOUNT,
     "taker": taker,
     "permit2_owner": taker,
+    "gasless_relay": True,
     "slippage_bps": SLIPPAGE_BPS,
     "chain_id": CHAIN_ID,
 }
