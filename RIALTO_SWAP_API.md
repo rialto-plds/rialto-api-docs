@@ -11,10 +11,20 @@ The public API base URL below for Rialto:
 https://rialto-trade-api.rialto.xyz
 ```
 
+The same base URL serves RH Chain (`4663`) and Arbitrum One (`42161`). Pass
+`chain_id` on every request; see [Chain Selection](#chain-selection).
+
 ## Router Registries
 
-Rialto publishes Router Registry contracts so partners can discover the active
-Rialto router instead of hardcoding router addresses.
+Rialto publishes a `RialtoRouterRegistry` contract on each chain so partners can
+discover the active Rialto router instead of hardcoding router addresses. When
+Rialto deploys a new router, it is first staged in the registry as `next`, then
+promoted to current, and the old router stays readable as `prev` during the
+migration window. Reading the registry lets you follow that migration without a
+code change on your side.
+
+Each flow has its own feature id. A feature id is the key the registry stores a
+router under, so the two flows can be migrated or paused independently.
 
 Use feature id `2` when you submit the transaction returned by `GET /quote`
 from the taker wallet. Use feature id `3` when you use Rialto's gasless relayer
@@ -27,29 +37,74 @@ flow through `POST /gasless/submit`.
 
 Registry deployments:
 
-| Chain | Chain id | API access | Router Registry |
+| Chain | Chain id | Public RPC | Router Registry |
 | --- | --- | --- | --- |
-| RH Chain | `4663` | `<your_robinhood_rpc_url>` | `0x71a120CbBf3Ce7cD910a3c50fF77aFc62735687E` |
+| RH Chain | `4663` | `https://rpc.mainnet.chain.robinhood.com` | `0x71a120CbBf3Ce7cD910a3c50fF77aFc62735687E` |
+| Arbitrum One | `42161` | `https://arb1.arbitrum.io/rpc` | `0x71A120BaECEF5005a7c6a6B401F9CEd48425E1e8` |
+
+The two registries share an address prefix but are different addresses. Use the
+one for the chain you are quoting on.
 
 Registry reads:
 
 | Function | Meaning |
 | --- | --- |
-| `ownerOf(uint256 featureId)` | Current active router for the feature. Reverts when the feature is paused or uninitialized. |
-| `prev(uint128 featureId)` | Previous router accepted during a migration dwell window. Reverts when no previous router is set. |
+| `ownerOf(uint256 featureId)` | Current active router for the feature. Reverts with `FeaturePaused(uint128)` when the feature is paused, or `ERC721NonexistentToken(uint256)` when it is uninitialized. |
+| `prev(uint128 featureId)` | Previous router accepted during a migration dwell window. Reverts with `NoInstance()` (`0x27eca1b0`) when no previous router is set, and with `FeaturePaused(uint128)` when paused. |
 | `next(uint128 featureId)` | Staged next router, or the zero address when none is staged. |
-| `getFeature(uint128 featureId)` | One-call read returning `(previous, current, next, paused)`. |
+| `getFeature(uint128 featureId)` | One-call read returning `(previous, current, next, paused)`. Does not revert when paused, so use it to read the paused flag. |
 
 In this registry, "owner" means the router address currently assigned to a
 feature id. It is not the registry admin owner.
 
-Raw JSON-RPC `curl` examples:
+### Reading the registry with `cast`
+
+[Foundry](https://getfoundry.sh) `cast` decodes the results for you:
 
 ```bash
-# Robinhood Chain:
-# Use your own Robinhood Chain RPC endpoint if you need direct registry reads.
-# RPC_URL='<your_robinhood_rpc_url>'
-# REGISTRY_ADDRESS='0x71a120CbBf3Ce7cD910a3c50fF77aFc62735687E'
+# Robinhood Chain
+RPC_URL='https://rpc.mainnet.chain.robinhood.com'
+REGISTRY='0x71a120CbBf3Ce7cD910a3c50fF77aFc62735687E'
+
+# Arbitrum One
+# RPC_URL='https://arb1.arbitrum.io/rpc'
+# REGISTRY='0x71A120BaECEF5005a7c6a6B401F9CEd48425E1e8'
+
+FEATURE_ID=2   # 2 = taker-submitted, 3 = gasless
+
+# Current router
+cast call "$REGISTRY" "ownerOf(uint256)(address)" "$FEATURE_ID" --rpc-url "$RPC_URL"
+
+# Staged next router (zero address when none is staged)
+cast call "$REGISTRY" "next(uint128)(address)" "$FEATURE_ID" --rpc-url "$RPC_URL"
+
+# Previous router (reverts with NoInstance() when none is set)
+cast call "$REGISTRY" "prev(uint128)(address)" "$FEATURE_ID" --rpc-url "$RPC_URL"
+
+# Full state: previous, current, next, paused
+cast call "$REGISTRY" "getFeature(uint128)(address,address,address,bool)" "$FEATURE_ID" --rpc-url "$RPC_URL"
+```
+
+### Reading the registry with JSON-RPC `curl`
+
+Each call is `eth_call` with a 4-byte selector followed by the feature id as one
+32-byte word:
+
+| Function | Selector | Calldata for feature `2` |
+| --- | --- | --- |
+| `ownerOf(uint256)` | `0x6352211e` | `0x6352211e0000000000000000000000000000000000000000000000000000000000000002` |
+| `prev(uint128)` | `0xe2603dc2` | `0xe2603dc20000000000000000000000000000000000000000000000000000000000000002` |
+| `next(uint128)` | `0x74bcde51` | `0x74bcde510000000000000000000000000000000000000000000000000000000000000002` |
+| `getFeature(uint128)` | `0x46df01a4` | `0x46df01a40000000000000000000000000000000000000000000000000000000000000002` |
+
+```bash
+# Robinhood Chain
+RPC_URL='https://rpc.mainnet.chain.robinhood.com'
+REGISTRY_ADDRESS='0x71a120CbBf3Ce7cD910a3c50fF77aFc62735687E'
+
+# Arbitrum One
+# RPC_URL='https://arb1.arbitrum.io/rpc'
+# REGISTRY_ADDRESS='0x71A120BaECEF5005a7c6a6B401F9CEd48425E1e8'
 
 # Feature 2 = taker-submitted quote transaction.
 # Feature 3 = gasless relayer flow.
@@ -84,6 +139,19 @@ curl -sS "$RPC_URL" \
 `eth_call` returns ABI-encoded hex. For single-address calls, the address is the
 last 20 bytes of the returned 32-byte word. For `getFeature`, decode four ABI
 words as `(address previous, address current, address next, bool paused)`.
+
+### Using the registry during a router migration
+
+- Treat `tx.to` from `/quote` as the router for that quote. Do not replace it
+  with an address read from the registry.
+- If you check `tx.to` against the registry, accept the feature's current,
+  `next` and `prev` routers. During a migration the API can start quoting
+  against the staged `next` router before it is promoted.
+- If `ownerOf` reverts with `FeaturePaused`, do not send swaps for that feature.
+- Permit2 quotes ask the taker to approve the Permit2 contract, not the
+  router, so a router migration does not require new Permit2 approvals.
+  Allowance-mode quotes ask the taker to approve the router itself; after a
+  migration, `issues.allowance` shows when the new router needs an approval.
 
 ## API Key Access
 
@@ -158,7 +226,8 @@ Returns tokens supported by the quote and swap APIs.
 Example:
 
 ```bash
-curl -sS 'https://rialto-trade-api.rialto.xyz/tokens'
+curl -sS 'https://rialto-trade-api.rialto.xyz/tokens?chain_id=4663'
+curl -sS 'https://rialto-trade-api.rialto.xyz/tokens?chain_id=42161'
 ```
 
 Example response shape:
@@ -213,11 +282,14 @@ Required query params:
 | --- | --- |
 | `sell_token` | Canonical `0x`-prefixed token address. Symbols are not accepted. |
 | `buy_token` | Canonical `0x`-prefixed token address. Symbols are not accepted. |
-| `sell_amount` | Human decimal sell amount, for example `0.01`. |
-| `taker` | Non-zero wallet address that will receive output. |
-| `slippage_bps` | Max slippage in basis points. Example: `50` means 0.50%. |
+| `sell_amount` | Human decimal sell amount in whole tokens, for example `0.01` WETH or `25` USDC. Rialto scales it by the token's decimals. |
+| `taker` | Non-zero wallet address that will receive output. Lowercase or checksummed hex is accepted. |
+| `slippage_bps` | Max slippage in basis points. Example: `50` means 0.50%. The server rejects values above its configured cap (currently `1000`). |
 
 `slippageBps` is also accepted as an alias for `slippage_bps`.
+
+`/quote` is exact-input only. There is no `buy_amount` request param; a request
+without `sell_amount` is rejected with `400`.
 
 `/quote` accepts token addresses only. Pass the canonical `address` value for
 each token. Symbol values such as `WETH` or `USDG` are rejected because
@@ -227,7 +299,7 @@ Optional query params:
 
 | Param | Description |
 | --- | --- |
-| `chain_id` | Chain id. Defaults to the server's configured chain. |
+| `chain_id` | `4663` for RH Chain or `42161` for Arbitrum One. See [Chain Selection](#chain-selection). Always pass it. |
 | `max_hops` | Optional route-depth hint; final route policy is controlled server-side. |
 | `permit2_owner` | Optional non-zero Permit2 token owner for caller-submitted or relayed ERC20 swaps. Must equal `taker` in v1. Also accepts `permit2Owner` and `permitOwner`. This selects Permit2 ownership; it does not imply Rialto pays gas. |
 | `gasless_relay` | Set to `true` only when the quote will be submitted through Rialto's `/gasless/submit`. Requires `permit2_owner`. Also accepts `gaslessRelay`. |
@@ -235,15 +307,38 @@ Optional query params:
 | `swap_fee_bps` | Integrator fee in basis points. Requires an integrator key — see [Integrator Fees](#integrator-fees). |
 | `swap_fee_token` | Optional fee-token hint. Fees are charged in the token selected by Rialto. |
 | `swap_fee_recipient` | Ignored. The payout wallet is bound to the API key. |
+| `tx_origin` | Optional address that will send the transaction, when it differs from `taker` (for example your own relayer). |
 
-Example:
+Examples:
 
 ```bash
-API_KEY='rialto_live_example.redacted_secret'
+export RIALTO_API_KEY='<your_api_key>'
+# Illustrative taker only. Use the real wallet that will receive the output.
+TAKER='0x1111111111111111111111111111111111111111'
 
-curl -sS 'https://rialto-trade-api.rialto.xyz/quote?sell_token=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73&buy_token=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168&sell_amount=0.01&taker=<taker_wallet_address>&slippage_bps=50' \
-  -H "Authorization: Bearer $API_KEY"
+# RH Chain (4663): sell 0.01 WETH for USDG
+curl -sS "https://rialto-trade-api.rialto.xyz/quote?chain_id=4663&sell_token=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73&buy_token=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168&sell_amount=0.01&taker=$TAKER&slippage_bps=50" \
+  -H "Authorization: Bearer $RIALTO_API_KEY"
+
+# Arbitrum One (42161): sell 0.01 WETH for USDC
+curl -sS "https://rialto-trade-api.rialto.xyz/quote?chain_id=42161&sell_token=0x82aF49447D8a07e3bd95BD0d56f35241523fBab1&buy_token=0xaf88d065e77c8cC2239327C5EDb3A432268e5831&sell_amount=0.01&taker=$TAKER&slippage_bps=50" \
+  -H "Authorization: Bearer $RIALTO_API_KEY"
+
+# Arbitrum One (42161): sell 25 USDC for WETH
+curl -sS "https://rialto-trade-api.rialto.xyz/quote?chain_id=42161&sell_token=0xaf88d065e77c8cC2239327C5EDb3A432268e5831&buy_token=0x82aF49447D8a07e3bd95BD0d56f35241523fBab1&sell_amount=25&taker=$TAKER&slippage_bps=50" \
+  -H "Authorization: Bearer $RIALTO_API_KEY"
 ```
+
+Token addresses used in these examples:
+
+| Chain | Token | Address | Decimals |
+| --- | --- | --- | --- |
+| RH Chain `4663` | WETH | `0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73` | 18 |
+| RH Chain `4663` | USDG | `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` | 6 |
+| Arbitrum One `42161` | WETH | `0x82aF49447D8a07e3bd95BD0d56f35241523fBab1` | 18 |
+| Arbitrum One `42161` | USDC | `0xaf88d065e77c8cC2239327C5EDb3A432268e5831` | 6 |
+
+Use `GET /tokens?chain_id=<chain_id>` for the full supported list on each chain.
 
 Important response fields:
 
@@ -417,6 +512,30 @@ Example response shape:
 
 The exact amounts and route legs depend on live liquidity.
 
+Arbitrum quotes have the same response shape, with `chain_id` set to `42161`.
+
+## Chain Selection
+
+Rialto serves RH Chain (`4663`) and Arbitrum One (`42161`) from the same base
+URL. The `chain_id` URL query param picks the chain for every endpoint,
+including `POST` endpoints such as `/gasless/submit` and the `/integrators/*`
+calls. A `chain_id` field in a JSON request body does not pick the chain; it is
+only checked against the chain the URL selected.
+
+| Request (multichain release) | Behavior |
+| --- | --- |
+| No `chain_id` | Served as RH Chain `4663`. |
+| `chain_id=4663` | RH Chain. |
+| `chain_id=42161` | Arbitrum One. |
+| Any other value | Rejected with `400`. |
+
+Always pass `chain_id` explicitly.
+
+To call an Arbitrum `POST` endpoint, put the chain on the URL, for example
+`POST https://rialto-trade-api.rialto.xyz/gasless/submit?chain_id=42161`.
+
+Arbitrum support goes live with the multichain release.
+
 ## Executing a Quote
 
 This section is for wallets, frontends, and other routers that want to integrate
@@ -586,11 +705,12 @@ witness signature, but the relayer wallet pays the network gas.
 Add `permit2_owner` and `gasless_relay=true` to the standard quote request:
 
 ```bash
-API_KEY='rialto_live_example.redacted_secret'
-TAKER='<taker_wallet_address>'
+export RIALTO_API_KEY='<your_api_key>'
+# Illustrative taker only. Use the real wallet that will sign and receive.
+TAKER='0x1111111111111111111111111111111111111111'
 
 curl -sS "https://rialto-trade-api.rialto.xyz/quote?sell_token=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168&buy_token=0xc93a8c440CEa26D7445dF01729f193b27965099f&sell_amount=1&taker=$TAKER&permit2_owner=$TAKER&gasless_relay=true&settlement=permit2&slippage_bps=50&chain_id=4663" \
-  -H "Authorization: Bearer $API_KEY"
+  -H "Authorization: Bearer $RIALTO_API_KEY"
 ```
 
 The response includes:
@@ -626,7 +746,7 @@ Example:
 
 ```bash
 curl -sS 'https://rialto-trade-api.rialto.xyz/gasless/submit' \
-  -H "Authorization: Bearer $API_KEY" \
+  -H "Authorization: Bearer $RIALTO_API_KEY" \
   -H 'Content-Type: application/json' \
   -d '{
     "quote_id": "b7b0a3d8-9f6a-4f4a-92d2-1b0e4b5d0c6a",
@@ -669,7 +789,7 @@ Example:
 
 ```bash
 curl -sS 'https://rialto-trade-api.rialto.xyz/gasless/status/f3f6a35f-93b9-4629-9a2e-02d2b80648ef' \
-  -H "Authorization: Bearer $API_KEY"
+  -H "Authorization: Bearer $RIALTO_API_KEY"
 ```
 
 ### Python gasless example
@@ -830,10 +950,11 @@ if relay["status"] != "confirmed":
 ### Direct-flow end-to-end example
 
 ```bash
-API_KEY='rialto_live_example.redacted_secret'
+export RIALTO_API_KEY='<your_api_key>'
+TAKER='0x1111111111111111111111111111111111111111'   # illustrative
 
-curl -sS 'https://rialto-trade-api.rialto.xyz/quote?sell_token=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73&buy_token=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168&sell_amount=0.01&taker=<taker_wallet_address>&slippage_bps=50' \
-  -H "Authorization: Bearer $API_KEY" -o quote.json
+curl -sS "https://rialto-trade-api.rialto.xyz/quote?chain_id=4663&sell_token=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73&buy_token=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168&sell_amount=0.01&taker=$TAKER&slippage_bps=50" \
+  -H "Authorization: Bearer $RIALTO_API_KEY" -o quote.json
 
 # In your app:
 # - If quote.issues.balance is non-null, show an insufficient-balance error.
@@ -893,7 +1014,7 @@ Request body:
 
 | Field | Description |
 | --- | --- |
-| `chain_id` | Optional chain id. Use `4663` for RH. |
+| `chain_id` | Optional chain id. Use `4663` for RH or `42161` for Arbitrum; it must match the URL `chain_id` (see [Chain Selection](#chain-selection)). |
 | `wallet` | Owner wallet that will sign. |
 | `action` | One of `create_integrator_application`, `create_integrator_api_key`, `revoke_integrator_api_key`, `view_integrator_profile`. |
 | `payload_hash` | Required for create/revoke actions. Not required for `view_integrator_profile`. |
@@ -1199,9 +1320,10 @@ a normal quote.
 | `swap_fee_bps` | Your fee in basis points, applied on top of Rialto's fee. `30` = 0.30%. `swapFeeBps` is also accepted. |
 
 ```bash
-INTEGRATOR_KEY='rialto_live_integrator.redacted_secret'
+INTEGRATOR_KEY='<your_integrator_api_key>'
+TAKER='0x1111111111111111111111111111111111111111'   # illustrative
 
-curl -sS 'https://rialto-trade-api.rialto.xyz/quote?sell_token=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73&buy_token=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168&sell_amount=0.01&taker=<taker_wallet_address>&slippage_bps=50&swap_fee_bps=30' \
+curl -sS "https://rialto-trade-api.rialto.xyz/quote?chain_id=4663&sell_token=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73&buy_token=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168&sell_amount=0.01&taker=$TAKER&slippage_bps=50&swap_fee_bps=30" \
   -H "Authorization: Bearer $INTEGRATOR_KEY"
 ```
 
