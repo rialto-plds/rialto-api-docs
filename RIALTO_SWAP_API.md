@@ -215,58 +215,6 @@ taker-submitted flow because ETH must be sent as `tx.value`.
 Integrators do not need to build route calldata, pool calls, fees, Permit2
 witnesses, or settlement actions themselves.
 
-## Public Endpoint: Tokens
-
-`GET /tokens`
-
-Auth: public
-
-Returns tokens supported by the quote and swap APIs.
-
-Example:
-
-```bash
-curl -sS 'https://rialto-trade-api.rialto.xyz/tokens?chain_id=4663'
-curl -sS 'https://rialto-trade-api.rialto.xyz/tokens?chain_id=42161'
-```
-
-Example response shape:
-
-```json
-{
-  "chain_id": 4663,
-  "tokens": [
-    {
-      "name": "ETH",
-      "symbol": "ETH",
-      "address": "<native_eth_sentinel>",
-      "decimals": 18,
-      "source": "constant",
-      "type": "non_stable"
-    },
-    {
-      "name": "Wrapped Ether",
-      "symbol": "WETH",
-      "address": "<sell_token_address>",
-      "decimals": 18,
-      "source": "whitelist",
-      "type": "non_stable"
-    }
-  ]
-}
-```
-
-Token fields:
-
-| Field | Description |
-| --- | --- |
-| `name` | Token display name. |
-| `symbol` | Token symbol. |
-| `address` | Token contract address. |
-| `decimals` | Token decimals. |
-| `source` | How the token entered the supported set. |
-| `type` | `stable` or `non_stable`. |
-
 ## Protected Endpoint: Quote
 
 `GET /quote`
