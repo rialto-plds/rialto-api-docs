@@ -11,6 +11,8 @@ The public API base URL below for Rialto:
 https://rialto-trade-api.rialto.xyz
 ```
 
+API Keys can now be applied for through the [Partners Page](https://app.rialto.xyz/partners)
+
 The same base URL serves RH Chain (`4663`) and Arbitrum One (`42161`). Pass
 `chain_id` on every request; see [Chain Selection](#chain-selection).
 
@@ -215,63 +217,13 @@ taker-submitted flow because ETH must be sent as `tx.value`.
 Integrators do not need to build route calldata, pool calls, fees, Permit2
 witnesses, or settlement actions themselves.
 
-## Public Endpoint: Tokens
-
-`GET /tokens`
-
-Auth: public
-
-Returns tokens supported by the quote and swap APIs.
-
-Example:
-
-```bash
-curl -sS 'https://rialto-trade-api.rialto.xyz/tokens?chain_id=4663'
-curl -sS 'https://rialto-trade-api.rialto.xyz/tokens?chain_id=42161'
-```
-
-Example response shape:
-
-```json
-{
-  "chain_id": 4663,
-  "tokens": [
-    {
-      "name": "ETH",
-      "symbol": "ETH",
-      "address": "<native_eth_sentinel>",
-      "decimals": 18,
-      "source": "constant",
-      "type": "non_stable"
-    },
-    {
-      "name": "Wrapped Ether",
-      "symbol": "WETH",
-      "address": "<sell_token_address>",
-      "decimals": 18,
-      "source": "whitelist",
-      "type": "non_stable"
-    }
-  ]
-}
-```
-
-Token fields:
-
-| Field | Description |
-| --- | --- |
-| `name` | Token display name. |
-| `symbol` | Token symbol. |
-| `address` | Token contract address. |
-| `decimals` | Token decimals. |
-| `source` | How the token entered the supported set. |
-| `type` | `stable` or `non_stable`. |
-
 ## Protected Endpoint: Quote
 
 `GET /quote`
 
 Auth: requires API key with quote access.
+
+API Keys can now be applied for through the [Partners Page](https://app.rialto.xyz/partners)
 
 Returns the best route, expected output, route legs, platform fee, estimated
 network fee, and an executable transaction for an exact-input swap.
@@ -968,6 +920,8 @@ curl -sS "https://rialto-trade-api.rialto.xyz/quote?chain_id=4663&sell_token=0x0
 ```
 
 ## Requesting an Integrator API Key
+
+API Keys can now be applied for through the [Partners Page](https://app.rialto.xyz/partners)
 
 Integrator keys are created through a wallet-signed onboarding flow. The wallet
 that applies becomes the owner wallet for the integrator profile and must also
