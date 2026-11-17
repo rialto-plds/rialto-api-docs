@@ -11,6 +11,8 @@ The public API base URL below for Rialto:
 https://rialto-trade-api.rialto.xyz
 ```
 
+API Keys can now be applied for through the [Partners Page](https://app.rialto.xyz/partners)
+
 The same base URL serves RH Chain (`4663`) and Arbitrum One (`42161`). Pass
 `chain_id` on every request; see [Chain Selection](#chain-selection).
 
@@ -220,6 +222,8 @@ witnesses, or settlement actions themselves.
 `GET /quote`
 
 Auth: requires API key with quote access.
+
+API Keys can now be applied for through the [Partners Page](https://app.rialto.xyz/partners)
 
 Returns the best route, expected output, route legs, platform fee, estimated
 network fee, and an executable transaction for an exact-input swap.
@@ -916,6 +920,8 @@ curl -sS "https://rialto-trade-api.rialto.xyz/quote?chain_id=4663&sell_token=0x0
 ```
 
 ## Requesting an Integrator API Key
+
+API Keys can now be applied for through the [Partners Page](https://app.rialto.xyz/partners)
 
 Integrator keys are created through a wallet-signed onboarding flow. The wallet
 that applies becomes the owner wallet for the integrator profile and must also
